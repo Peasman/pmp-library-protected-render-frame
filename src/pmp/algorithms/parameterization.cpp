@@ -59,7 +59,7 @@ void setup_boundary_constraints(SurfaceMesh& mesh)
         length += distance(points[loop[i]], points[loop[(i + 1) % n]]);
 
     // map length intervals to unit circle intervals
-    for (i = 0, l = 0.0; i < n;)
+    for (i = 0, l = 0.0; i < n; l += distance(points[loop[i]], points[loop[(i + 1) % n]]), ++i)
     {
         // go from 2pi to 0 to preserve orientation
         angle = 2.0 * std::numbers::pi * (1.0 - l / length);
@@ -68,12 +68,6 @@ void setup_boundary_constraints(SurfaceMesh& mesh)
         t[1] = 0.5 + 0.5 * sinf(angle);
 
         tex[loop[i]] = t;
-
-        ++i;
-        if (i < n)
-        {
-            l += distance(points[loop[i]], points[loop[(i + 1) % n]]);
-        }
     }
 }
 
