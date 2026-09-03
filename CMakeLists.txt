@@ -106,8 +106,16 @@ if(PMP_BUILD_VIEWERS)
 
   # glfw3webgpu: create a WebGPU surface from a GLFW window (all platforms
   # including the HTML canvas under Emscripten)
-  add_library(glfw3webgpu STATIC
-              ${GLFW3WEBGPU_SOURCE_DIR}/glfw3webgpu.c
+  if(APPLE AND NOT EMSCRIPTEN)
+    # the Cocoa/Metal path is Objective-C: compile through an .m wrapper
+    enable_language(OBJC)
+    file(WRITE "${CMAKE_BINARY_DIR}/glfw3webgpu_objc.m"
+         "#include \"${PROJECT_SOURCE_DIR}/${GLFW3WEBGPU_SOURCE_DIR}/glfw3webgpu.c\"\n")
+    set(GLFW3WEBGPU_SOURCES "${CMAKE_BINARY_DIR}/glfw3webgpu_objc.m")
+  else()
+    set(GLFW3WEBGPU_SOURCES ${GLFW3WEBGPU_SOURCE_DIR}/glfw3webgpu.c)
+  endif()
+  add_library(glfw3webgpu STATIC ${GLFW3WEBGPU_SOURCES}
               ${GLFW3WEBGPU_SOURCE_DIR}/glfw3webgpu.h)
   target_include_directories(glfw3webgpu
                              PUBLIC ${PROJECT_SOURCE_DIR}/${GLFW3WEBGPU_SOURCE_DIR})
@@ -131,7 +139,6 @@ if(PMP_BUILD_VIEWERS)
       target_compile_definitions(glfw3webgpu PRIVATE _GLFW_COCOA)
     endif()
     if(APPLE)
-      target_compile_options(glfw3webgpu PRIVATE -x objective-c)
       target_link_libraries(glfw3webgpu PUBLIC "-framework Cocoa" "-framework QuartzCore" "-framework Metal")
     endif()
   endif()
