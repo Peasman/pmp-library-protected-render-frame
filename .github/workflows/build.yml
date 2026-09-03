@@ -50,7 +50,8 @@ jobs:
         run: |
           set -o pipefail
           cmake --build . --config $BUILD_TYPE --parallel 2>&1 | tee build.log || {
-            grep -nE 'error|Error|undefined|Undefined' build.log | head -30 | sed 's/^/::error::/'
+            grep -nE 'error|Error|undefined|Undefined' build.log | head -6 | sed 's/^/::error::/'
+            tail -n 4 build.log | sed 's/^/::error::TAIL /'
             exit 1
           }
 
