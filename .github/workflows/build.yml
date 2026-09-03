@@ -46,7 +46,13 @@ jobs:
       - name: Build
         working-directory: ${{runner.workspace}}/build
         shell: bash
-        run: cmake --build . --config $BUILD_TYPE --parallel
+        # surface the first error lines as annotations (visible without a token)
+        run: |
+          set -o pipefail
+          cmake --build . --config $BUILD_TYPE --parallel 2>&1 | tee build.log || {
+            grep -nE 'error|Error|undefined|Undefined' build.log | head -30 | sed 's/^/::error::/'
+            exit 1
+          }
 
       - name: Test
         working-directory: ${{runner.workspace}}/build
