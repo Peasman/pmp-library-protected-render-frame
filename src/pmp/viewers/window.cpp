@@ -469,9 +469,11 @@ void Window::draw_imgui()
 
 #if __EMSCRIPTEN__
 // Wait for the next animation frame (suspends via ASYNCIFY).
+// clang-format off
 EM_ASYNC_JS(void, pmp_wait_animation_frame, (), {
-    await new Promise((resolve) = > requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
 });
+// clang-format on
 #endif
 
 int Window::run()

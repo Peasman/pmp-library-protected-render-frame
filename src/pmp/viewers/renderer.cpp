@@ -896,9 +896,10 @@ void Renderer::draw(const mat4& projection_matrix, const mat4& modelview_matrix,
     if (mesh_.is_empty())
         return;
 
-    // setup matrices
+    // setup matrices (convert OpenGL clip-space depth [-1,1] to WebGPU [0,1])
     const mat4 mv_matrix = modelview_matrix;
-    const mat4 mvp_matrix = projection_matrix * modelview_matrix;
+    const mat4 mvp_matrix =
+        GpuContext::depth_zero_to_one() * projection_matrix * modelview_matrix;
     const mat3 n_matrix = inverse(transpose(linear_part(mv_matrix)));
 
     // setup uniforms (matrices are column-major in both pmp and WGSL)

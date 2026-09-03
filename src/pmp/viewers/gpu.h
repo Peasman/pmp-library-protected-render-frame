@@ -142,6 +142,20 @@ public:
     //! submitted work has finished (like `glFinish()`).
     void poll(bool wait);
 
+    //! \brief Matrix converting an OpenGL-style projection (clip z in
+    //! [-1,1]) to the WebGPU convention (clip z in [0,1]).
+    //! \details All matrices in the viewers follow OpenGL conventions; apply
+    //! this on the left of the projection matrix before uploading it, i.e.
+    //! `depth_zero_to_one() * projection * modelview`. Depth values read back
+    //! from the GPU can then be mapped to OpenGL NDC with `2 * z - 1`.
+    static mat4 depth_zero_to_one()
+    {
+        mat4 m = mat4::identity();
+        m(2, 2) = 0.5f;
+        m(2, 3) = 0.5f;
+        return m;
+    }
+
     //! Construct a string view from a C string.
     static WGPUStringView str(const char* s)
     {
