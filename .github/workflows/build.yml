@@ -41,7 +41,13 @@ jobs:
       - name: Configure CMake
         shell: bash
         working-directory: ${{runner.workspace}}/build
-        run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DPMP_BUILD_EXAMPLES=ON -DPMP_BUILD_TESTS=ON -DPMP_BUILD_REGRESSIONS=ON
+        run: |
+          set -o pipefail
+          cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DPMP_BUILD_EXAMPLES=ON -DPMP_BUILD_TESTS=ON -DPMP_BUILD_REGRESSIONS=ON 2>&1 | tee configure.log || {
+            grep -nE -A3 'CMake Error|error' configure.log | head -12 | sed 's/^/::error::/'
+            tail -n 6 configure.log | sed 's/^/::error::TAIL /'
+            exit 1
+          }
 
       - name: Build
         working-directory: ${{runner.workspace}}/build
