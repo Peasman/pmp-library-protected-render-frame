@@ -28,13 +28,14 @@ public:
     void load_matcap(const std::filesystem::path& filename);
 
     //! load a texture from file \p filename
-    void load_texture(const std::filesystem::path& filename,
-                      GLint format = GL_RGB,
-                      GLint min_filter = GL_LINEAR_MIPMAP_LINEAR,
-                      GLint mag_filter = GL_LINEAR,
-                      GLint wrap = GL_CLAMP_TO_EDGE);
+    void load_texture(
+        const std::filesystem::path& filename,
+        TextureFormat format = TextureFormat::RGB,
+        TextureFilter min_filter = TextureFilter::LinearMipmapLinear,
+        TextureFilter mag_filter = TextureFilter::Linear,
+        TextureWrap wrap = TextureWrap::ClampToEdge);
 
-    //! update mesh normals and all buffers for OpenGL rendering.  call this
+    //! update mesh normals and all GPU buffers for rendering.  call this
     //! function whenever you change either the vertex positions or the
     //! triangulation of the mesh
     virtual void update_mesh();

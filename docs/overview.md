@@ -1,6 +1,6 @@
 # Overview {#overview}
 
-This section provides a high-level overview of PMP. We describe its design as well as the capabilities provided by the library. PMP is organized into different components. At the core of the library is the @ref core component providing a data structure for polygonal surface meshes. On top of the @ref core component the @ref algorithms component provides implementations of canonical geometry processing algorithms such as remeshing, decimation, subdivision, and smoothing. The optional @ref viewers component provides OpenGL&reg;-based viewers.
+This section provides a high-level overview of PMP. We describe its design as well as the capabilities provided by the library. PMP is organized into different components. At the core of the library is the @ref core component providing a data structure for polygonal surface meshes. On top of the @ref core component the @ref algorithms component provides implementations of canonical geometry processing algorithms such as remeshing, decimation, subdivision, and smoothing. The optional @ref viewers component provides WebGPU-based viewers (rendering through Vulkan, Metal, or Direct3D 12 via wgpu-native).
 
 ## Core
 
@@ -14,4 +14,4 @@ The @ref algorithms component provides implementations of canonical geometry pro
 
 ## Viewers
 
-In order to easily create viewers the library contains an optional @ref viewers component including basic viewers, e.g., pmp::MeshViewer. The corresponding OpenGL&reg; code for rendering the data is contained in pmp::Renderer class.
+In order to easily create viewers the library contains an optional @ref viewers component including basic viewers, e.g., pmp::MeshViewer. The corresponding WebGPU code for rendering the data is contained in the pmp::Renderer class; device and frame management live in pmp::GpuContext.

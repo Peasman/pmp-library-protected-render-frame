@@ -1,5 +1,7 @@
-// Copyright 2011-2020 the Polygon Mesh Processing Library developers.
+// Copyright 2011-2026 the Polygon Mesh Processing Library developers.
 // SPDX-License-Identifier: MIT
+
+#pragma once
 
 // clang-format off
 
@@ -7,62 +9,33 @@
 // spherical environment mapping is just the normal's XY
 // scaled by 0.5 and shifted by 0.5.
 // scale by 0.49 to avoid artifacts at gracing angles
-static const char* matcap_vshader =
-#ifndef __EMSCRIPTEN__
-    "#version 330"
-#else
-    "#version 300 es"
-#endif
-R"glsl(
-layout (location=0) in vec4 v_position;
-layout (location=1) in vec3 v_normal;
-out vec3 v2f_normal;
-uniform mat4 modelview_projection_matrix;
-uniform mat3 normal_matrix;
+// (requires shader_uniforms_wgsl from phong_shader.h to be prepended)
+static const char* matcap_shader_wgsl = R"wgsl(
+struct VertexOut {
+    @builtin(position) position : vec4<f32>,
+    @location(0) normal : vec3<f32>,
+};
 
-void main()
-{
-    v2f_normal = normalize(normal_matrix * v_normal);
-    gl_Position = modelview_projection_matrix * v_position;
+@vertex
+fn vs_main(in : VertexIn) -> VertexOut {
+    var out : VertexOut;
+    out.normal   = normalize(u.normal_matrix * in.normal);
+    out.position = u.modelview_projection_matrix * vec4<f32>(in.position, 1.0);
+    return out;
 }
-)glsl";
 
-
-static const char* matcap_fshader =
-#ifndef __EMSCRIPTEN__
-    "#version 330"
-#else
-    "#version 300 es"
-#endif
-R"glsl(
-precision mediump float;
-
-in vec3 v2f_normal;
-uniform sampler2D matcap;
-uniform float  alpha;
-out vec4 f_color;
-
-vec2 uv;
-vec4 rgba;
-
-void main()
-{
-    if (gl_FrontFacing)
-    {
-        uv = normalize(v2f_normal).xy * 0.49 + 0.5;
-        rgba = texture(matcap, uv);
+@fragment
+fn fs_main(in : VertexOut, @builtin(front_facing) front_facing : bool) -> @location(0) vec4<f32> {
+    var n = normalize(in.normal);
+    if (!front_facing) { n = -n; }
+    let uv = n.xy * 0.49 + 0.5;
+    var rgba = textureSample(tex, tex_sampler, uv);
+    if (!front_facing) {
+        // damp color of back faces
+        rgba = vec4<f32>(rgba.rgb * 0.5, rgba.a);
     }
-    else
-    {
-        // invert normal, damp color
-        uv = normalize(-v2f_normal).xy * 0.49 + 0.5;
-        rgba = texture(matcap, uv);
-        rgba.rgb *= 0.5;
-    }
-
-    rgba.a *= alpha;
-    f_color = rgba;
+    return vec4<f32>(rgba.rgb, rgba.a * u.alpha);
 }
-)glsl";
+)wgsl";
 
 // clang-format on

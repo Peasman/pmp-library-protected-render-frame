@@ -23,13 +23,13 @@ Some parts of PMP depend on the following third-party libraries:
 | Library                                             | Description                       | Version     |
 | --------------------------------------------------- | --------------------------------- | ----------- |
 | [Eigen](http://eigen.tuxfamily.org)                 | C++ linear algebra library        | &ge; 3.4.0  |
-| [OpenGL](http://opengl.org)                         | Open Graphics Library             | &ge; 3.3    |
-| [GLAD](https://github.com/Dav1dde/glad)             | OpenGL loader library             | &ge; 2.0.8  |
+| [wgpu-native](https://github.com/gfx-rs/wgpu-native) | WebGPU implementation (Vulkan, Metal, DX12) | v29 |
+| [glfw3webgpu](https://github.com/eliemichel/glfw3webgpu) | WebGPU surface creation for GLFW | 2025 |
 | [GLFW](http://glfw.org)                             | Graphics Library Framework        | &ge; 3.4    |
 | [ImGui](https://github.com/ocornut/imgui)           | Immediate Mode GUI                | &ge; 1.90.4 |
 | [Google Test](https://github.com/google/googletest) | C++ Test Framework                | &ge; 1.13.0 |
 
-By default, we include the corresponding libraries in our repository. Note that OpenGL and related dependencies are optional. They are only needed if you want to use the viewer classes. Google Test is optional as well and only required if you want to run the unit test suite.
+By default, we include the corresponding libraries in our repository. Note that wgpu-native and related dependencies are optional. They are only needed if you want to use the viewer classes. Google Test is optional as well and only required if you want to run the unit test suite.
 
 ## Configuration
 
@@ -124,7 +124,7 @@ This way, you can simply link your own target against PMP
 target_link_libraries(your_target pmp)
 ```
 
-**Note:** The usage described above is currently limited to the @ref core and @ref algorithms components of PMP. If you want to use the @ref viewers component you need to link your target against `pmp_viewers` and its dependencies: `stb_image`, `imgui`, `glfw`, as well as your platform OpenGL library.
+**Note:** The usage described above is currently limited to the @ref core and @ref algorithms components of PMP. If you want to use the @ref viewers component you need to link your target against `pmp_viewers` and its dependencies: `stb_image`, `imgui`, `glfw`, as well as `glfw3webgpu` and `wgpu_native`.
 
 ## Build Options
 

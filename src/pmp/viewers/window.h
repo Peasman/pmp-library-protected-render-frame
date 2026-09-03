@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "pmp/viewers/gl.h"
+#include "pmp/viewers/gpu.h"
 #include "pmp/mat_vec.h"
 
 #include <imgui.h>
@@ -13,6 +13,9 @@
 #include <array>
 #include <string>
 
+#ifndef GLFW_INCLUDE_NONE
+#define GLFW_INCLUDE_NONE
+#endif
 #include <GLFW/glfw3.h>
 
 #if __EMSCRIPTEN__
@@ -114,8 +117,12 @@ protected:
     void draw_help_dialog();
 
     //! take a screenshot, save it to `title-n.png` using the window title
-    //! and an incremented number `n`.
+    //! and an incremented number `n`. The image is captured at the end of
+    //! the next rendered frame.
     void screenshot();
+
+    //! access the WebGPU context used for rendering
+    GpuContext& gpu() { return GpuContext::get(); }
 
     //! width of window
     int width() const { return width_; }
@@ -241,6 +248,11 @@ public:
     {
         if (instance_)
             instance_->color_mode(LightMode);
+    }
+    static void take_screenshot()
+    {
+        if (instance_)
+            instance_->screenshot();
     }
 };
 

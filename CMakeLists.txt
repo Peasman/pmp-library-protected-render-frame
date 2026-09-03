@@ -26,7 +26,8 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 if(PMP_BUILD_VIEWERS)
   set(GLFW_SOURCE_DIR_INTERNAL "external/glfw-3.4")
-  set(GLAD_SOURCE_DIR "external/glad-2.0.8")
+  set(WGPU_SOURCE_DIR "external/wgpu-native")
+  set(GLFW3WEBGPU_SOURCE_DIR "external/glfw3webgpu")
   set(IMGUI_SOURCE_DIR "external/imgui-1.92.6")
   set(STB_IMAGE_SOURCE_DIR "external/stb_image-2.28")
   set(STB_IMAGE_WRITE_SOURCE_DIR "external/stb_image_write-1.16")
@@ -57,10 +58,52 @@ if(PMP_BUILD_VIEWERS)
     set(GLFW_BUILD_WAYLAND False)
   endif()
 
-  # setup use of GLFW and GLAD
+  # setup use of GLFW and wgpu-native (WebGPU implementation on top of
+  # Vulkan / Metal / DX12)
   if(NOT EMSCRIPTEN)
     add_subdirectory(${GLFW_SOURCE_DIR_INTERNAL})
-    include_directories(${GLAD_SOURCE_DIR}/include)
+
+    add_library(wgpu_native SHARED IMPORTED GLOBAL)
+    set_target_properties(
+      wgpu_native
+      PROPERTIES
+        IMPORTED_LOCATION
+        "${PROJECT_SOURCE_DIR}/${WGPU_SOURCE_DIR}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}wgpu_native${CMAKE_SHARED_LIBRARY_SUFFIX}"
+        INTERFACE_INCLUDE_DIRECTORIES
+        "${PROJECT_SOURCE_DIR}/${WGPU_SOURCE_DIR}/include")
+
+  endif()
+
+  # glfw3webgpu: create a WebGPU surface from a GLFW window (all platforms
+  # including the HTML canvas under Emscripten)
+  add_library(glfw3webgpu STATIC
+              ${GLFW3WEBGPU_SOURCE_DIR}/glfw3webgpu.c
+              ${GLFW3WEBGPU_SOURCE_DIR}/glfw3webgpu.h)
+  target_include_directories(glfw3webgpu
+                             PUBLIC ${PROJECT_SOURCE_DIR}/${GLFW3WEBGPU_SOURCE_DIR})
+  if(EMSCRIPTEN)
+    target_compile_definitions(glfw3webgpu PUBLIC WEBGPU_BACKEND_EMDAWNWEBGPU)
+    target_compile_options(glfw3webgpu PUBLIC --use-port=emdawnwebgpu)
+  else()
+    target_link_libraries(glfw3webgpu PUBLIC glfw wgpu_native)
+    # glfw3webgpu selects the native surface type from GLFW's private
+    # platform macros, so replicate them here
+    if(GLFW_BUILD_X11)
+      target_compile_definitions(glfw3webgpu PRIVATE _GLFW_X11)
+    endif()
+    if(GLFW_BUILD_WAYLAND)
+      target_compile_definitions(glfw3webgpu PRIVATE _GLFW_WAYLAND)
+    endif()
+    if(WIN32)
+      target_compile_definitions(glfw3webgpu PRIVATE _GLFW_WIN32)
+    endif()
+    if(APPLE)
+      target_compile_definitions(glfw3webgpu PRIVATE _GLFW_COCOA)
+    endif()
+    if(APPLE)
+      target_compile_options(glfw3webgpu PRIVATE -x objective-c)
+      target_link_libraries(glfw3webgpu PUBLIC "-framework Cocoa" "-framework QuartzCore" "-framework Metal")
+    endif()
   endif()
 
   # setup IMGUI
@@ -135,11 +178,18 @@ endif()
 
 if(EMSCRIPTEN)
   # add_compile_options(--no-heap-copy)
-  add_compile_options(-fexceptions)
-  add_link_options(-fexceptions)
+  add_compile_options(-fwasm-exceptions)
+  add_link_options(-fwasm-exceptions)
   add_link_options(
-    "SHELL:-sWASM=1 -sUSE_WEBGL2=1 -sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1 -sALLOW_TABLE_GROWTH=1 -sSTACK_SIZE=5MB -sEXPORTED_RUNTIME_METHODS=[ccall]"
+    "SHELL:-sWASM=1 -sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1 -sALLOW_TABLE_GROWTH=1 -sSTACK_SIZE=5MB -sEXPORTED_RUNTIME_METHODS=[ccall,FS,UTF8ToString]"
   )
+  # WebGPU through the emdawnwebgpu port; ASYNCIFY lets us block on
+  # WebGPU futures (adapter/device requests, buffer mapping)
+  add_link_options("SHELL:--use-port=emdawnwebgpu -sASYNCIFY=1 -sASYNCIFY_STACK_SIZE=1048576")
+  option(PMP_EMSCRIPTEN_ASSERTIONS "Enable Emscripten runtime assertions and heap checks" OFF)
+  if(PMP_EMSCRIPTEN_ASSERTIONS)
+    add_link_options("SHELL:-sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_OVERFLOW_CHECK=2")
+  endif()
   set(CMAKE_EXECUTABLE_SUFFIX ".html")
 endif()
 

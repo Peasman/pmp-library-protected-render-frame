@@ -188,21 +188,15 @@ void TrackballViewer::motion(double xpos, double ypos)
 
 void TrackballViewer::init()
 {
-    // set initial state
-    glClearColor(1.0, 1.0, 1.0, 1.0);
-    glEnable(GL_DEPTH_TEST);
-    glFrontFace(GL_CCW);
+    // depth test, CCW front faces, and clear color are fixed pipeline
+    // state of the WebGPU renderer
 
     // init modelview
     modelview_matrix_ = mat4::identity();
 
-// turn on multi-sampling to anti-alias lines
-#ifndef __EMSCRIPTEN__
-    glEnable(GL_MULTISAMPLE);
-    GLint n_samples;
-    glGetIntegerv(GL_SAMPLES, &n_samples);
-    std::cout << "Multi-sampling uses " << n_samples << " per pixel\n";
-#endif
+    // multi-sampling to anti-alias lines is always on
+    std::cout << "Multi-sampling uses " << GpuContext::msaa_samples
+              << " samples per pixel\n";
 }
 
 void TrackballViewer::set_scene(const vec3& center, float radius)
@@ -228,18 +222,20 @@ bool TrackballViewer::pick(vec3& result)
 
 bool TrackballViewer::pick(int x, int y, vec3& result)
 {
-#ifndef __EMSCRIPTEN__ // WebGL cannot read depth buffer
-
-    // get viewport data
-    std::array<GLint, 4> viewport;
-    glGetIntegerv(GL_VIEWPORT, viewport.data());
+    // viewport covers the whole window
+    const std::array<int, 4> viewport{0, 0, width(), height()};
 
     // in OpenGL y=0 is at the 'bottom'
     y = viewport[3] - y;
 
-    // read depth buffer value at (x, y_new)
-    float zf;
-    glReadPixels(x, y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &zf);
+    // read depth buffer value at (x, y_new) by re-rendering the scene
+    // into an off-screen depth buffer
+    float zf = GpuContext::get().read_depth(x, y, [this]() {
+        if (draw_mode_ < draw_mode_names_.size())
+            draw(draw_mode_names_[draw_mode_]);
+        else
+            draw("");
+    });
 
     if (zf != 1.0f)
     {
@@ -260,8 +256,6 @@ bool TrackballViewer::pick(int x, int y, vec3& result)
 
         return true;
     }
-
-#endif
 
     return false;
 }
@@ -376,7 +370,7 @@ double TrackballViewer::measure_fps()
     vec3 axis;
 
     // disable vsync
-    glfwSwapInterval(0);
+    GpuContext::get().set_vsync(false);
 
     StopWatch timer;
     timer.start();
@@ -397,13 +391,14 @@ double TrackballViewer::measure_fps()
         render_frame();
     }
 
-    glFinish();
+    // wait for the GPU to finish
+    GpuContext::get().poll(true);
 
     timer.stop();
     fps = (1000.0 / timer.elapsed() * (3.0 * frames));
 
     // re-enable vsync
-    glfwSwapInterval(1);
+    GpuContext::get().set_vsync(true);
 
     return fps;
 }

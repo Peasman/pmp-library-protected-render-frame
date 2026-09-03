@@ -84,8 +84,8 @@ void MeshViewer::load_matcap(const std::filesystem::path& filename)
 }
 
 void MeshViewer::load_texture(const std::filesystem::path& filename,
-                              GLint format, GLint min_filter, GLint mag_filter,
-                              GLint wrap)
+                              TextureFormat format, TextureFilter min_filter,
+                              TextureFilter mag_filter, TextureWrap wrap)
 {
     // load texture from file
     try
@@ -133,7 +133,7 @@ void MeshViewer::update_mesh()
     radius_ = 0.5f * bb.size();
 
     // re-compute face and vertex normals
-    renderer_.update_opengl_buffers();
+    renderer_.update_buffers();
 }
 
 void MeshViewer::process_imgui()

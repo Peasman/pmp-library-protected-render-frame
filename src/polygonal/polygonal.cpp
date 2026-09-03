@@ -155,15 +155,13 @@ void Polygonal::update_mesh()
     radius_ = 0.5f * bb.size();
 
     // re-compute face and vertex normals
-    renderer_.update_opengl_buffers();
+    renderer_.update_buffers();
 }
 
 void Polygonal::draw(const std::string& drawMode)
 {
-    glViewport(300, 0, width(), height());
-
-    // clear buffers
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // leave room for the side panel (buffers are cleared per frame)
+    gpu().set_viewport(300, 0, width(), height());
 
     // draw mesh
     renderer_.draw(projection_matrix_, modelview_matrix_, drawMode);
@@ -1389,8 +1387,7 @@ void Polygonal::topology_changed()
 Vertex Polygonal::pick_vertex(int x, int y)
 {
     // get viewport data
-    std::array<GLint, 4> viewport;
-    glGetIntegerv(GL_VIEWPORT, viewport.data());
+    const auto& viewport = gpu().viewport();
 
     // screen (x,y) to ndc
     float ndc_x = (2.0f * (x - viewport[0])) / viewport[2] - 1.0f;
@@ -1476,8 +1473,7 @@ void Polygonal::select_lasso(bool surface)
     };
 
     // get viewport
-    GLint viewport[4];
-    glGetIntegerv(GL_VIEWPORT, viewport);
+    const auto& viewport = gpu().viewport();
 
     const auto pmv = projection_matrix_ * modelview_matrix_;
 

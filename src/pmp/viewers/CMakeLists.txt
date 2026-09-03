@@ -8,27 +8,26 @@ if(EMSCRIPTEN)
   target_include_directories(
     pmp_viewers PRIVATE ${PROJECT_SOURCE_DIR}/${STB_IMAGE_WRITE_SOURCE_DIR}
                         ${PROJECT_SOURCE_DIR}/${STB_IMAGE_SOURCE_DIR})
-  target_link_libraries(pmp_viewers stb_image stb_image_write imgui pmp)
+  target_link_libraries(pmp_viewers stb_image stb_image_write imgui pmp
+                        glfw3webgpu)
 
 else()
 
-  find_package(OpenGL REQUIRED)
-
-  if(OpenGL_FOUND)
+  if(TRUE)
     add_library(pmp_viewers STATIC ${SRCS} ${HDRS})
     target_include_directories(
       pmp_viewers
       PRIVATE ${PROJECT_SOURCE_DIR}/${STB_IMAGE_WRITE_SOURCE_DIR}
-              ${PROJECT_SOURCE_DIR}/${STB_IMAGE_SOURCE_DIR}
-      PUBLIC ${PROJECT_SOURCE_DIR}/${GLAD_SOURCE_DIR}/include)
+              ${PROJECT_SOURCE_DIR}/${STB_IMAGE_SOURCE_DIR})
     target_link_libraries(
       pmp_viewers
-      pmp
-      stb_image
-      stb_image_write
+      PUBLIC pmp
       imgui
       glfw
-      ${OPENGL_LIBRARIES})
+      glfw3webgpu
+      wgpu_native
+      PRIVATE stb_image
+      stb_image_write)
     if(PMP_INSTALL)
       install(TARGETS pmp_viewers DESTINATION lib)
       install(FILES ${HDRS} DESTINATION include/pmp/viewers)

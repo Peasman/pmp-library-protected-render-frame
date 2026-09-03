@@ -65,7 +65,7 @@ int main(int argc, char** argv)
     }
     if (texture)
     {
-        viewer.load_texture(texture, GL_SRGB8);
+        viewer.load_texture(texture, TextureFormat::SRGB);
     }
     else if (matcap)
     {

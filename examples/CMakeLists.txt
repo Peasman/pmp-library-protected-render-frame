@@ -72,15 +72,13 @@ if(EMSCRIPTEN AND PMP_BUILD_VIEWERS)
 
 else()
 
-  find_package(OpenGL)
-
   # build mconvert only on unix / OS-X
   if(NOT WIN32)
     add_executable(mconvert mconvert.cpp)
     target_link_libraries(mconvert pmp)
   endif()
 
-  if(OpenGL_FOUND AND PMP_BUILD_VIEWERS)
+  if(PMP_BUILD_VIEWERS)
     add_executable(mview mview.cpp)
     target_link_libraries(mview pmp_viewers)
 

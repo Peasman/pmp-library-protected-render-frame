@@ -8,11 +8,19 @@ add_library(imgui STATIC ${SOURCES} ${HEADERS})
 target_link_libraries(imgui ${CMAKE_DL_LIBS})
 target_compile_definitions(imgui PUBLIC IMGUI_USER_CONFIG="pmp_imconfig.h")
 
+target_compile_definitions(imgui PUBLIC GLFW_INCLUDE_NONE)
+if(EMSCRIPTEN)
+  target_compile_definitions(imgui PUBLIC IMGUI_IMPL_WEBGPU_BACKEND_DAWN)
+  target_compile_options(imgui PUBLIC --use-port=emdawnwebgpu)
+else()
+  target_compile_definitions(imgui PUBLIC IMGUI_IMPL_WEBGPU_BACKEND_WGPU)
+endif()
 if(NOT EMSCRIPTEN)
   target_include_directories(
     imgui
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../${GLFW_SOURCE_DIR_INTERNAL}/include")
+  target_link_libraries(imgui wgpu_native)
 else()
   target_include_directories(imgui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 endif()

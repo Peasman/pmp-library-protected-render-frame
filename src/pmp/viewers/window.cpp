@@ -12,16 +12,12 @@
 #include <sstream>
 
 #include <imgui_impl_glfw.h>
-#include <imgui_impl_opengl3.h>
+#include <imgui_impl_wgpu.h>
 #include <stb_image_write.h>
 
 #if __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 #include <emscripten/html5.h>
-#include <GL/gl.h>
-#else
-#define GLAD_GL_IMPLEMENTATION
-#include <glad/gl.h>
 #endif
 
 static inline float im_trunc(float f)
@@ -40,6 +36,13 @@ Window* Window::instance_ = nullptr;
 Window::Window(const char* title, int width, int height, bool showgui)
     : title_(title), width_(width), height_(height), show_imgui_(showgui)
 {
+#ifdef __EMSCRIPTEN__
+    // In the browser the WebGPU surface is the HTML canvas, which does not
+    // depend on the GLFW window. Initialize WebGPU first: creating the GLFW
+    // window before the (ASYNCIFY-suspended) adapter/device requests leads to
+    // memory corruption with Emscripten's GLFW shim.
+    GpuContext::get().init(nullptr);
+#endif
     // initialize glfw window
     if (!glfwInit())
         exit(EXIT_FAILURE);
@@ -49,12 +52,8 @@ Window::Window(const char* title, int width, int height, bool showgui)
         if (c == ' ')
             c = '_';
 
-    // request core profile and OpenGL version 3.2
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-    glfwWindowHint(GLFW_SAMPLES, 4);
+    // no OpenGL context: rendering goes through WebGPU (Vulkan/Metal/DX12)
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
 
     window_ = glfwCreateWindow(width, height, title, nullptr, nullptr);
@@ -66,53 +65,15 @@ Window::Window(const char* title, int width, int height, bool showgui)
         exit(EXIT_FAILURE);
     }
 
-    glfwMakeContextCurrent(window_);
     instance_ = this;
 
-#ifndef __EMSCRIPTEN__
-    const auto version = gladLoadGL(glfwGetProcAddress);
-    if (version == 0)
-    {
-        std::cout << "Failed to initialize OpenGL context\n";
-        exit(EXIT_FAILURE);
-    }
-#endif
+    // initialize WebGPU (instance, adapter, device, surface)
+    if (!GpuContext::get().is_initialized())
+        GpuContext::get().init(window_);
 
-    // check for sufficient OpenGL version
-    GLint major, minor;
-    glGetIntegerv(GL_MAJOR_VERSION, &major);
-    glGetIntegerv(GL_MINOR_VERSION, &minor);
-    const GLint glversion = 10 * major + minor;
-#ifdef __EMSCRIPTEN__
-    if (glversion < 30)
-    {
-        // clang-format will line-break strings, which will break EM_ASM
-        // clang-format off
-        std::cerr << "Cannot get WebGL2 context. Try using Firefox or Chrome/Chromium.\n";
-        EM_ASM(alert("Cannot get WebGL2 context. Try using Firefox or Chrome/Chromium."));
-        // clang-format on
-        glfwTerminate();
-        exit(EXIT_FAILURE);
-    }
-#else
-    if (glversion < 32)
-    {
-        std::cerr << "Cannot get modern OpenGL context.\n";
-        glfwTerminate();
-        exit(EXIT_FAILURE);
-    }
-#endif
-
-    // enable v-sync
-    glfwSwapInterval(1);
-
-    // debug: print GL and GLSL version
-    std::cout << "GL     " << glGetString(GL_VERSION) << std::endl;
-    std::cout << "GLSL   " << glGetString(GL_SHADING_LANGUAGE_VERSION)
+    // debug: print graphics backend and device
+    std::cout << "GPU    " << GpuContext::get().adapter_description()
               << std::endl;
-
-    // call glGetError once to clear error queue
-    glGetError();
 
     // detect highDPI framebuffer scaling and UI scaling
     int window_width, window_height, framebuffer_width, framebuffer_height;
@@ -120,8 +81,9 @@ Window::Window(const char* title, int width, int height, bool showgui)
     glfwGetFramebufferSize(window_, &framebuffer_width, &framebuffer_height);
     width_ = framebuffer_width;
     height_ = framebuffer_height;
-    scaling_ = static_cast<float>(framebuffer_width) /
-               static_cast<float>(window_width);
+    scaling_ = window_width > 0 ? static_cast<float>(framebuffer_width) /
+                                      static_cast<float>(window_width)
+                                : 1.0f;
     if (scaling_ != 1)
         std::cout << "highDPI scaling: " << scaling_ << std::endl;
 
@@ -174,9 +136,10 @@ Window::Window(const char* title, int width, int height, bool showgui)
 
 Window::~Window()
 {
-    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplWGPU_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
+    GpuContext::get().shutdown();
     glfwTerminate(); // this automatically destroys remaining windows
 }
 
@@ -188,12 +151,18 @@ void Window::init_imgui()
     ImGuiIO& io = ImGui::GetIO();
     (void)io;
     io.IniFilename = nullptr;
-    ImGui_ImplGlfw_InitForOpenGL(window_, false);
+    ImGui_ImplGlfw_InitForOther(window_, false);
+
+    auto& gpu = GpuContext::get();
+    ImGui_ImplWGPU_InitInfo init_info;
+    init_info.Device = gpu.device();
+    init_info.NumFramesInFlight = 3;
+    init_info.RenderTargetFormat = gpu.surface_format();
+    init_info.DepthStencilFormat = GpuContext::depth_format;
+    init_info.PipelineMultisampleState.count = GpuContext::msaa_samples;
+    ImGui_ImplWGPU_Init(&init_info);
 #ifdef __EMSCRIPTEN__
-    ImGui_ImplOpenGL3_Init("#version 300 es");
     ImGui_ImplGlfw_InstallEmscriptenCallbacks(window_, "#canvas");
-#else
-    ImGui_ImplOpenGL3_Init("#version 330");
 #endif
 
     // load Inter font
@@ -498,10 +467,26 @@ void Window::draw_imgui()
     }
 }
 
+#if __EMSCRIPTEN__
+// Wait for the next animation frame (suspends via ASYNCIFY).
+EM_ASYNC_JS(void, pmp_wait_animation_frame, (), {
+    await new Promise((resolve) = > requestAnimationFrame(resolve));
+});
+#endif
+
 int Window::run()
 {
 #if __EMSCRIPTEN__
-    emscripten_set_main_loop(Window::instance_render_frame, 0, 1);
+    // Drive the frame loop from main() instead of emscripten_set_main_loop().
+    // The latter leaves main() by throwing, which with wasm exceptions runs
+    // the destructors of main()'s locals (i.e. this window) while the loop
+    // keeps rendering. Suspending here keeps everything alive and lets
+    // render_frame() block on WebGPU futures (picking, read-back).
+    while (true)
+    {
+        render_frame();
+        pmp_wait_animation_frame();
+    }
 #else
     while (!glfwWindowShouldClose(window_))
     {
@@ -513,8 +498,6 @@ int Window::run()
 
 void Window::render_frame()
 {
-    glfwMakeContextCurrent(window_);
-
 #if __EMSCRIPTEN__
     // dynamicall adjust window size based on container
     double dw, dh;
@@ -530,43 +513,33 @@ void Window::render_frame()
     glfwGetWindowSize(window_, &window_width, &window_height);
     glfwGetFramebufferSize(instance_->window_, &framebuffer_width,
                            &framebuffer_height);
-    scaling_ = static_cast<float>(framebuffer_width) /
-               static_cast<float>(window_width);
+    scaling_ = window_width > 0 ? static_cast<float>(framebuffer_width) /
+                                      static_cast<float>(window_width)
+                                : 1.0f;
 
-    // setup viewport
-    glViewport(0, 0, framebuffer_width, framebuffer_height);
+    auto& gpu = GpuContext::get();
 
-    // clear buffers
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glClearColor(clear_color_[0], clear_color_[1], clear_color_[2], 0.0);
+    // acquire swap chain image, clear color and depth, begin render pass
+    if (gpu.begin_frame(clear_color_))
+    {
+        width_ = framebuffer_width;
+        height_ = framebuffer_height;
 
-    // draw scene
-    display();
+        // draw scene
+        display();
 
-    // draw GUI
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-    draw_imgui();
-    ImGui::Render();
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        // draw GUI into the same render pass
+        gpu.set_viewport(0, 0, framebuffer_width, framebuffer_height);
+        ImGui_ImplWGPU_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        draw_imgui();
+        ImGui::Render();
+        ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), gpu.pass());
 
-#if __EMSCRIPTEN__
-    // to avoid problems with premultiplied alpha in WebGL,
-    // clear alpha values to 1.0
-    // see here: https://webgl2fundamentals.org/webgl/lessons/webgl-and-alpha.html
-    // (no way to disable premultiplied-alpha in emscripten-glfw)
-    GLfloat rgba[4];
-    glGetFloatv(GL_COLOR_CLEAR_VALUE, rgba);
-    glClearColor(1, 1, 1, 1);
-    glColorMask(false, false, false, true);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glColorMask(true, true, true, true);
-    glClearColor(rgba[0], rgba[1], rgba[2], rgba[3]);
-#endif
-
-    // swap buffers
-    glfwSwapBuffers(window_);
+        // submit and present
+        gpu.end_frame();
+    }
 
     // handle events
     glfwPollEvents();
@@ -639,7 +612,7 @@ void Window::keyboard(int key, int /*code*/, int action, int /*mods*/)
         case GLFW_KEY_ESCAPE:
         case GLFW_KEY_Q:
         {
-            glfwSetWindowShouldClose(window_, GL_TRUE);
+            glfwSetWindowShouldClose(window_, GLFW_TRUE);
             break;
         }
 
@@ -778,6 +751,7 @@ void Window::glfw_resize(GLFWwindow* /*window*/, int width, int height)
 {
     instance_->width_ = width;
     instance_->height_ = height;
+    GpuContext::get().configure_surface(width, height);
     instance_->resize(width, height);
 }
 
@@ -804,21 +778,38 @@ void Window::screenshot()
     filename << title_ << std::to_string(screenshot_number_++) << ".png";
     std::cout << "Save screenshot to " << filename.str() << std::endl;
 
-    // allocate buffer
-    auto data = new unsigned char[3 * width_ * height_];
-
-    // read framebuffer
-    glfwMakeContextCurrent(window_);
-    glPixelStorei(GL_PACK_ALIGNMENT, 1);
-    glReadPixels(0, 0, width_, height_, GL_RGB, GL_UNSIGNED_BYTE, data);
-
-    // write to file
-    stbi_flip_vertically_on_write(true);
-    stbi_write_png(filename.str().c_str(), width_, height_, 3, data,
-                   3 * width_);
-
-    // clean up
-    delete[] data;
+    // the framebuffer is read back at the end of the next frame
+    GpuContext::get().request_framebuffer(
+        [name = filename.str(), clear = clear_color_](
+            const std::vector<unsigned char>& rgb, int width, int height) {
+            // rows arrive bottom-first (OpenGL convention)
+            stbi_flip_vertically_on_write(true);
+            stbi_write_png(name.c_str(), width, height, 3, rgb.data(),
+                           3 * width);
+#ifdef __EMSCRIPTEN__
+            // report content (useful for headless testing) and offer the
+            // PNG stored in the virtual filesystem as a download
+            size_t drawn = 0;
+            for (size_t i = 0; i + 2 < rgb.size(); i += 3)
+                if (std::abs(rgb[i] - 255 * clear[0]) > 2 ||
+                    std::abs(rgb[i + 1] - 255 * clear[1]) > 2 ||
+                    std::abs(rgb[i + 2] - 255 * clear[2]) > 2)
+                    ++drawn;
+            std::cout << "Screenshot " << width << "x" << height << ", "
+                      << drawn << " non-background pixels" << std::endl;
+            // clang-format off
+            EM_ASM({
+                const name = UTF8ToString($0);
+                const data = FS.readFile(name);
+                const blob = new Blob([data], {type: 'image/png'});
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = name;
+                a.click();
+            }, name.c_str());
+        // clang-format on
+#endif
+        });
 }
 
 #if __EMSCRIPTEN__
@@ -852,6 +843,11 @@ EMSCRIPTEN_KEEPALIVE void light_mode()
 EMSCRIPTEN_KEEPALIVE void dark_mode()
 {
     pmp::Window::dark_mode();
+}
+
+EMSCRIPTEN_KEEPALIVE void pmp_screenshot()
+{
+    pmp::Window::take_screenshot();
 }
 }
 #endif

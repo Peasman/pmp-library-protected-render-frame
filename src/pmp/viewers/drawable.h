@@ -14,10 +14,11 @@ class Drawable
 public:
     virtual ~Drawable() = default;
 
-    //! Update OpenGL buffers
+    //! Update GPU buffers
     virtual void update_buffers() = 0;
 
-    //! Draw the object
+    //! Draw the object into the render pass currently recorded by
+    //! GpuContext (see GpuContext::pass()).
     //! \param projection Projection matrix
     //! \param modelview Modelview matrix
     virtual void draw(const mat4& projection, const mat4& modelview) = 0;

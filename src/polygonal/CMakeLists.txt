@@ -17,8 +17,6 @@ if(EMSCRIPTEN)
       ${CMAKE_SOURCE_DIR}/docs/_static/polygonal-dark.svg ${FAVICONS}
       ${PROJECT_BINARY_DIR})
 else()
-  find_package(OpenGL REQUIRED)
   add_executable(polygonal main.cpp polygonal.cpp lasso_drawable.cpp)
-  target_link_libraries(polygonal pmp_viewers pmp imgui glfw
-                        ${OPENGL_LIBRARIES})
+  target_link_libraries(polygonal pmp_viewers pmp imgui glfw)
 endif()

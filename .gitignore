@@ -5,3 +5,6 @@ html
 .cache
 .vscode
 .DS_store
+build-*
+external/wgpu-native/lib/libwgpu_native.a
+external/wgpu-native/wgpu-native-meta/
