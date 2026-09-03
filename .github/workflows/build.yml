@@ -55,9 +55,9 @@ jobs:
         # surface the first error lines as annotations (visible without a token)
         run: |
           set -o pipefail
-          cmake --build . --config $BUILD_TYPE --parallel 2>&1 | tee build.log || {
-            grep -nE 'error|Error|undefined|Undefined' build.log | head -6 | sed 's/^/::error::/'
-            tail -n 4 build.log | sed 's/^/::error::TAIL /'
+          cmake --build . --config $BUILD_TYPE --parallel --verbose 2>&1 | tee build.log || {
+            grep -n -m1 -B6 'error:' build.log | cut -c1-300 | sed 's/^/::error::/'
+            grep -n 'glfw3webgpu_objc' build.log | head -2 | cut -c1-400 | sed 's/^/::error::CMD /'
             exit 1
           }
 
