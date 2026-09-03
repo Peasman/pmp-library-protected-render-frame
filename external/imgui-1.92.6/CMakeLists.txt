@@ -21,6 +21,13 @@ if(NOT EMSCRIPTEN)
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../${GLFW_SOURCE_DIR_INTERNAL}/include")
   target_link_libraries(imgui wgpu_native)
+  if(APPLE)
+    # the WebGPU backend's surface helper uses Cocoa: compile as Objective-C++
+    set_source_files_properties(
+      ${CMAKE_CURRENT_SOURCE_DIR}/imgui_impl_wgpu.cpp
+      PROPERTIES COMPILE_OPTIONS "-x;objective-c++")
+    target_link_libraries(imgui "-framework Cocoa" "-framework QuartzCore")
+  endif()
 else()
   target_include_directories(imgui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
