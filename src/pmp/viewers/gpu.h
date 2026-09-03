@@ -71,6 +71,10 @@ public:
     void configure_surface(uint32_t width, uint32_t height);
     //! Enable or disable vertical synchronization (default: enabled).
     void set_vsync(bool enable);
+    //! Width in pixels of the currently configured surface / attachments.
+    uint32_t surface_width() const { return width_; }
+    //! Height in pixels of the currently configured surface / attachments.
+    uint32_t surface_height() const { return height_; }
     //!@}
 
     //! \name Frame management

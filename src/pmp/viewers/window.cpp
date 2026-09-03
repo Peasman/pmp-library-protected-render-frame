@@ -9,6 +9,7 @@
 #include "fa_font.h"
 #include "fa_icons.h"
 
+#include <cmath>
 #include <sstream>
 
 #include <imgui_impl_glfw.h>
@@ -524,16 +525,24 @@ void Window::render_frame()
     // acquire swap chain image, clear color and depth, begin render pass
     if (gpu.begin_frame(clear_color_))
     {
-        width_ = framebuffer_width;
-        height_ = framebuffer_height;
+        // use the size of the attachments configured for this frame; the
+        // window may be resizing right now (e.g. entering fullscreen)
+        width_ = gpu.surface_width();
+        height_ = gpu.surface_height();
 
         // draw scene
         display();
 
         // draw GUI into the same render pass
-        gpu.set_viewport(0, 0, framebuffer_width, framebuffer_height);
+        gpu.set_viewport(0, 0, width_, height_);
         ImGui_ImplWGPU_NewFrame();
         ImGui_ImplGlfw_NewFrame();
+        // keep ImGui's notion of the display consistent with the attachments,
+        // otherwise its scissor rectangles can exceed the render target
+        ImGuiIO& io = ImGui::GetIO();
+        io.DisplayFramebufferScale = ImVec2(scaling_, scaling_);
+        io.DisplaySize = ImVec2(std::floor(width_ / scaling_),
+                                std::floor(height_ / scaling_));
         ImGui::NewFrame();
         draw_imgui();
         ImGui::Render();
