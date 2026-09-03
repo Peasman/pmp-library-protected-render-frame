@@ -61,6 +61,11 @@ if(PMP_BUILD_VIEWERS)
   # setup use of GLFW and wgpu-native (WebGPU implementation on top of
   # Vulkan / Metal / DX12)
   if(NOT EMSCRIPTEN)
+    if(APPLE)
+      # enable Objective-C once at top level: GLFW enables it in its own
+      # subdirectory, and enabling it again later leaves it half-configured
+      enable_language(OBJC)
+    endif()
     add_subdirectory(${GLFW_SOURCE_DIR_INTERNAL})
 
     # select the prebuilt wgpu-native binary for this platform
@@ -108,7 +113,6 @@ if(PMP_BUILD_VIEWERS)
   # including the HTML canvas under Emscripten)
   if(APPLE AND NOT EMSCRIPTEN)
     # the Cocoa/Metal path is Objective-C: compile through an .m wrapper
-    enable_language(OBJC)
     file(WRITE "${CMAKE_BINARY_DIR}/glfw3webgpu_objc.m"
          "#include \"${PROJECT_SOURCE_DIR}/${GLFW3WEBGPU_SOURCE_DIR}/glfw3webgpu.c\"\n")
     set(GLFW3WEBGPU_SOURCES "${CMAKE_BINARY_DIR}/glfw3webgpu_objc.m")
