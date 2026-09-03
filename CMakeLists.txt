@@ -63,14 +63,44 @@ if(PMP_BUILD_VIEWERS)
   if(NOT EMSCRIPTEN)
     add_subdirectory(${GLFW_SOURCE_DIR_INTERNAL})
 
+    # select the prebuilt wgpu-native binary for this platform
+    if(WIN32)
+      set(WGPU_PLATFORM "windows-x86_64")
+    elseif(APPLE)
+      if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+        set(WGPU_PLATFORM "macos-aarch64")
+      else()
+        set(WGPU_PLATFORM "macos-x86_64")
+      endif()
+    else()
+      set(WGPU_PLATFORM "linux-x86_64")
+    endif()
+    set(WGPU_LIB_DIR "${PROJECT_SOURCE_DIR}/${WGPU_SOURCE_DIR}/lib/${WGPU_PLATFORM}")
+    message(STATUS "Using wgpu-native binaries from ${WGPU_LIB_DIR}")
+
     add_library(wgpu_native SHARED IMPORTED GLOBAL)
     set_target_properties(
       wgpu_native
       PROPERTIES
         IMPORTED_LOCATION
-        "${PROJECT_SOURCE_DIR}/${WGPU_SOURCE_DIR}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}wgpu_native${CMAKE_SHARED_LIBRARY_SUFFIX}"
+        "${WGPU_LIB_DIR}/${CMAKE_SHARED_LIBRARY_PREFIX}wgpu_native${CMAKE_SHARED_LIBRARY_SUFFIX}"
         INTERFACE_INCLUDE_DIRECTORIES
         "${PROJECT_SOURCE_DIR}/${WGPU_SOURCE_DIR}/include")
+    if(WIN32)
+      set_target_properties(wgpu_native PROPERTIES
+                            IMPORTED_IMPLIB "${WGPU_LIB_DIR}/wgpu_native.dll.lib")
+    endif()
+
+    # copy the wgpu-native DLL next to an executable (Windows only)
+    function(pmp_copy_wgpu_dll target)
+      if(WIN32)
+        add_custom_command(
+          TARGET ${target}
+          POST_BUILD
+          COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:wgpu_native>
+                  $<TARGET_FILE_DIR:${target}>)
+      endif()
+    endfunction()
 
   endif()
 

@@ -10,6 +10,7 @@
 
 #include "pmp/mat_vec.h"
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <string>

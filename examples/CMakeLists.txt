@@ -109,6 +109,11 @@ else()
     add_executable(mpview mpview.cpp mesh_processing_viewer.cpp
                           mesh_processing_viewer.h)
     target_link_libraries(mpview pmp_viewers)
+
+    foreach(viewer_target mview curvature subdivision smoothing fairing
+            parameterization decimation remeshing hole_filling mpview)
+      pmp_copy_wgpu_dll(${viewer_target})
+    endforeach()
   endif()
 
 endif()
