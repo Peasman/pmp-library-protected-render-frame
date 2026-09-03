@@ -784,6 +784,7 @@ void Window::screenshot()
     GpuContext::get().request_framebuffer(
         [name = filename.str(), clear = clear_color_](
             const std::vector<unsigned char>& rgb, int width, int height) {
+            (void)clear; // only used for the browser report below
             // rows arrive bottom-first (OpenGL convention)
             stbi_flip_vertically_on_write(true);
             stbi_write_png(name.c_str(), width, height, 3, rgb.data(),
